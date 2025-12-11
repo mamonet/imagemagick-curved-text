@@ -1,0 +1,92 @@
+# repo path: .github/workflows/ci.yml
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Lint shell sources
+        run: |
+          shellcheck --version
+          shellcheck curve-text.sh lib/*.sh
+
+      # The .bats files are bash with a test harness on top. shellcheck cannot
+      # parse the @test syntax, so lint the helper and check the rest parses.
+      - name: Lint test helper
+        run: shellcheck --shell=bash tests/test_helper.bash
+
+      - name: Check the bats files are syntactically valid bash
+        run: |
+          for f in tests/*.bats; do
+            sed 's/^@test .* {$/test_case() {/' "$f" | bash -n \
+              || { echo "syntax error in $f"; exit 1; }
+          done
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # jq is a real dependency and is not stubbed. ImageMagick is installed so
+      # the suite runs in the same shape as a developer machine, but the tests
+      # replace it with a recording stub and never decode an image, so a broken
+      # IM build would not silently pass here.
+      - name: Install jq, ImageMagick and bats
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq imagemagick bats
+
+      - name: Versions
+        run: |
+          jq --version
+          bats --version
+          magick -version || convert -version
+
+      - name: Run the test suite
+        run: bats --print-output-on-failure tests/
+
+  # The example input must stay valid and in step with the docs.
+  items:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: items.json is a non-empty array of objects with a known mode
+        run: |
+          jq -e 'type == "array" and length > 0' items.json >/dev/null
+          jq -e 'all(.[]; type == "object")' items.json >/dev/null
+          jq -e 'all(.[]; .mode | IN("arc","perspective","displace","cylinderize"))' \
+             items.json >/dev/null
+          jq -e 'all(.[]; has("text") and has("font") and has("mockup")
+                          and has("center_x") and has("center_y"))' items.json >/dev/null
+
+      # samples/ is allowed to hold committed before/after pairs. Run output is
+      # not: out/ and the .tmp intermediates must never be tracked.
+      - name: No run output is committed
+        run: |
+          tracked="$(git ls-files 'out' 'out/*' 'tmp' 'tmp/*' '*.tmp.png')"
+          if [ -n "$tracked" ]; then
+            printf 'generated output is tracked; see .gitignore\n%s\n' "$tracked"
+            exit 1
+          fi
