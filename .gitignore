@@ -1,0 +1,40 @@
+# repo path: .gitignore
+
+# Generated renders are NOT committed. Every image under out/ is reproducible
+# from items.json plus the mockups, and out/manifest.tsv records the exact
+# parameters behind each file, so committing the pixels adds weight without
+# adding information.
+#
+# The one exception is samples/: a small, downsampled, hand-picked set of
+# before/after pairs, committed on purpose so the output can be judged without
+# running anything. Those are added deliberately, not swept in by a glob.
+out/
+tmp/
+*.tmp.png
+
+# Intermediate label and bent-label files from --keep-intermediates.
+intermediates/
+dmap-*.png
+
+# Local assets people fetch rather than commit: fonts they are licensed for,
+# and full-resolution mockups. Both directories keep their README and .gitkeep.
+fonts/*
+!fonts/.gitkeep
+!fonts/README.md
+!fonts/*OFL.txt
+!fonts/*LICENSE*
+
+mockups/*
+!mockups/.gitkeep
+!mockups/README.md
+
+# Fred Weinhaus' cylinderize.sh is licensed separately and must not be
+# vendored here, even accidentally. Install it on PATH instead. Leading slash:
+# this is the repo root only, and never lib/cylinderize.sh, which is our own
+# wrapper around it.
+/cylinderize.sh
+
+.DS_Store
+Thumbs.db
+*.swp
+*~
